@@ -1,7 +1,7 @@
 import XCTest
 
-import KeychainTests
+import KeychainMacOSTests
 
 var tests = [XCTestCaseEntry]()
-tests += KeychainTests.allTests()
+tests += KeychainMacOSTests.allTests()
 XCTMain(tests)
