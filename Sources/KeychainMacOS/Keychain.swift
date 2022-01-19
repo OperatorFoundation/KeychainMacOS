@@ -2,7 +2,7 @@
 import Crypto
 import Foundation
 
-public class Keychain
+public class Keychain: Codable
 {
     public init() {}
     

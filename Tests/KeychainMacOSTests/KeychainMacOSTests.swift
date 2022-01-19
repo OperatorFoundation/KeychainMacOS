@@ -1,5 +1,5 @@
 import XCTest
-@testable import Keychain
+@testable import KeychainMacOS
 
 final class KeychainMacOSTests: XCTestCase {
     func testExample() {
