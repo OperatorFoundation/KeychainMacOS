@@ -2,13 +2,12 @@ import XCTest
 @testable import KeychainMacOS
 
 final class KeychainMacOSTests: XCTestCase {
-    func testExample() {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct
-        // results.
-    }
+    func testExample()
+    {
+        let keychain = Keychain()
+        let key1 = keychain.generateAndSavePrivateSigningKey(label: "test")
+        let key2 = keychain.retrieveOrGeneratePrivateSigningKey(label: "test")
 
-    static var allTests = [
-        ("testExample", testExample),
-    ]
+        XCTAssertEqual(key1, key2)
+    }
 }

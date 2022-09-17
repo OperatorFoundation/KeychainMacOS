@@ -5,7 +5,8 @@ import Foundation
 public class Keychain: Codable
 {
     public init() {}
-    
+
+    // Key Agreement
     public func retrieveOrGeneratePrivateKey(label: String) -> P256.KeyAgreement.PrivateKey?
     {
         // Do we already have a key?
@@ -151,6 +152,123 @@ public class Keychain: Codable
             print("Deleted a key.\n")
         default:
             print("Unexpected status: \(deleteStatus.description)\n")
+        }
+    }
+
+    // Signing
+    public func retrieveOrGeneratePrivateSigningKey(label: String) -> P256.Signing.PrivateKey?
+    {
+        // Do we already have a key?
+        if let key = retrievePrivateSigningKey(label: label)
+        {
+            return key
+        }
+
+        // We don't?
+        // Let's create some and return those
+        let privateKey = P256.Signing.PrivateKey()
+
+        // Save the key we stored
+        let stored = storePrivateSigningKey(privateKey, label: label)
+        if !stored
+        {
+            print("😱 Failed to store our new server key.")
+            return nil
+        }
+        return privateKey
+    }
+
+    public func generateAndSavePrivateSigningKey(label: String) -> P256.Signing.PrivateKey?
+    {
+        let privateKey = P256.Signing.PrivateKey()
+
+        // Save the key we stored
+        let stored = storePrivateSigningKey(privateKey, label: label)
+        if !stored
+        {
+            print("😱 Failed to store our new server key.")
+            return nil
+        }
+
+        return privateKey
+    }
+
+    public func storePrivateSigningKey(_ key: P256.Signing.PrivateKey, label: String) -> Bool
+    {
+        let attributes = [kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
+                         kSecAttrKeyClass: kSecAttrKeyClassPrivate] as [String: Any]
+
+        // Get a SecKey representation.
+        var error: Unmanaged<CFError>?
+        let keyData = key.x963Representation as CFData
+        guard let secKey = SecKeyCreateWithData(keyData,
+                                                attributes as CFDictionary,
+                                                &error)
+        else
+        {
+            print("Unable to create SecKey representation.")
+            if let secKeyError = error
+            {
+                print(secKeyError)
+            }
+            return false
+        }
+
+        // Describe the add operation.
+        let query = [kSecClass: kSecClassKey,
+      kSecAttrApplicationLabel: label,
+            kSecAttrAccessible: kSecAttrAccessibleWhenUnlocked,
+ kSecUseDataProtectionKeychain: true,
+                  kSecValueRef: secKey] as [String: Any]
+
+        // Add the key to the keychain.
+        let status = SecItemAdd(query as CFDictionary, nil)
+
+        switch status {
+            case errSecSuccess:
+                return true
+            default:
+                if let statusString = SecCopyErrorMessageString(status, nil)
+                {
+                    print("Unable to store item: \(statusString)")
+                }
+
+                return false
+        }
+    }
+
+    public func retrievePrivateSigningKey(label: String) -> P256.Signing.PrivateKey?
+    {
+        let query: CFDictionary = generateKeySearchQuery(label: label)
+
+        // Find and cast the result as a SecKey instance.
+        var item: CFTypeRef?
+        var secKey: SecKey
+        switch SecItemCopyMatching(query as CFDictionary, &item) {
+            case errSecSuccess: secKey = item as! SecKey
+            case errSecItemNotFound: return nil
+            case let status:
+                print("Keychain read failed: \(status)")
+                return nil
+        }
+
+        // Convert the SecKey into a CryptoKit key.
+        var error: Unmanaged<CFError>?
+        guard let data = SecKeyCopyExternalRepresentation(secKey, &error) as Data?
+        else
+        {
+            print(error.debugDescription)
+            return nil
+        }
+
+        do {
+            let key = try P256.Signing.PrivateKey(x963Representation: data)
+            return key
+        }
+        catch let keyError
+        {
+            print("Error decoding key: \(keyError)")
+            return nil
         }
     }
 }
