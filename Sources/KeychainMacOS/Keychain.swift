@@ -27,7 +27,21 @@ public class Keychain: Codable, KeychainProtocol
         {
             // We don't?
             // Let's create some and return those
-            let privateKey = try PrivateKey(type: type)
+            var privateKey: PrivateKey? = nil
+            while privateKey == nil
+            {
+                let tempPrivateKey = try PrivateKey(type: type)
+                guard tempPrivateKey.data != nil else
+                {
+                    continue
+                }
+                privateKey = tempPrivateKey
+            }
+
+            guard let privateKey = privateKey else
+            {
+                return nil
+            }
 
             // Save the key we stored
             let stored = storePrivateKey(privateKey, label: label)
@@ -48,7 +62,21 @@ public class Keychain: Codable, KeychainProtocol
     {
         do
         {
-            let privateKey = try PrivateKey(type: type)
+            var privateKey: PrivateKey? = nil
+            while privateKey == nil
+            {
+                let tempPrivateKey = try PrivateKey(type: type)
+                guard tempPrivateKey.data != nil else
+                {
+                    continue
+                }
+                privateKey = tempPrivateKey
+            }
+
+            guard let privateKey = privateKey else
+            {
+                return nil
+            }
 
             // Save the key we stored
             let stored = storePrivateKey(privateKey, label: label)
