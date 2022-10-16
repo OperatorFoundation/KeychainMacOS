@@ -6,7 +6,7 @@
       "location" : "https://github.com/OperatorFoundation/Datable",
       "state" : {
         "branch" : "main",
-        "revision" : "93daf97ee4b6fcb275e22cc2ce1f019409cb257e"
+        "revision" : "8cb921cab89b0d2a21b356734377cd449e7476ed"
       }
     },
     {
@@ -15,7 +15,7 @@
       "location" : "https://github.com/OperatorFoundation/KeychainTypes",
       "state" : {
         "branch" : "main",
-        "revision" : "44bc8c44c7bd4cf6e7d080e2975356abb7770613"
+        "revision" : "46528f7a760412a709f20eca174b475d17c9d808"
       }
     },
     {

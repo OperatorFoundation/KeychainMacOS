@@ -79,8 +79,7 @@ public class Keychain: Codable, KeychainProtocol
             }
 
             // Save the key we stored
-            let stored = storePrivateKey(privateKey, label: label)
-            if !stored
+            guard storePrivateKey(privateKey, label: label) else
             {
                 print("😱 Failed to store our new server key.")
                 return nil
@@ -96,26 +95,23 @@ public class Keychain: Codable, KeychainProtocol
     
     public func storePrivateKey(_ key: PrivateKey, label: String) -> Bool
     {
-        let attributes = [kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
-                          kSecAttrKeyClass: kSecAttrKeyClassPrivate] as [String: Any]
+        let attributes = [kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom, kSecAttrKeyClass: kSecAttrKeyClassPrivate] as [String: Any]
 
         // Get a SecKey representation.
         var error: Unmanaged<CFError>?
-        guard let data = key.typedData else
+        guard let data = key.x963 else
         {
             return false
         }
         let keyData = data as CFData
-        guard let secKey = SecKeyCreateWithData(keyData,
-                                                attributes as CFDictionary,
-                                                &error)
-            else
+        guard let secKey = SecKeyCreateWithData(keyData, attributes as CFDictionary, &error) else
         {
             print("Unable to create SecKey representation.")
             if let secKeyError = error
             {
                 print(secKeyError)
             }
+
             return false
         }
         
