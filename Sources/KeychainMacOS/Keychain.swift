@@ -2,6 +2,7 @@
 import Crypto
 import Foundation
 
+import Datable
 import KeychainTypes
 
 public class Keychain: Codable, KeychainProtocol
@@ -213,4 +214,77 @@ public class Keychain: Codable, KeychainProtocol
             print("Unexpected status: \(deleteStatus.description)\n")
         }
     }
+
+    public func storePassword(server: String, username: String, password: String) throws
+    {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassInternetPassword,
+            kSecAttrAccount as String: username,
+            kSecAttrServer as String: server,
+            kSecValueData as String: password
+        ]
+
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else
+        {
+            throw KeychainError.addFailed(status)
+        }
+    }
+
+    public func retrievePassword(server: String) throws -> (username: String, password: String)
+    {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassInternetPassword,
+            kSecAttrServer as String: server,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecReturnAttributes as String: true,
+            kSecReturnData as String: true
+        ]
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status != errSecItemNotFound else
+        {
+            throw KeychainError.noPassword
+        }
+
+        guard status == errSecSuccess else
+        {
+            throw KeychainError.readFailed(status)
+        }
+
+        guard let existingItem = item as? [String : Any],
+              let passwordData = existingItem[kSecValueData as String] as? Data,
+              let password = String(data: passwordData, encoding: String.Encoding.utf8),
+              let account = existingItem[kSecAttrAccount as String] as? String
+        else
+        {
+            throw KeychainError.unexpectedPasswordData
+        }
+
+        return (username: account, password: password)
+    }
+
+    public func deletePassword(server: String) throws
+    {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassInternetPassword,
+            kSecAttrServer as String: server
+        ]
+
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else
+        {
+            throw KeychainError.deleteFailed(status)
+        }
+    }
+}
+
+public enum KeychainError: Error
+{
+    case addFailed(OSStatus)
+    case deleteFailed(OSStatus)
+    case noPassword
+    case readFailed(OSStatus)
+    case unexpectedPasswordData
 }
