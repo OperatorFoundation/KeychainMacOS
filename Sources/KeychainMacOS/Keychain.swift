@@ -11,6 +11,34 @@ public class Keychain: Codable, KeychainProtocol
     {
     }
 
+    public func generateEphemeralKeypair(type: KeyType) -> Keypair?
+    {
+        do
+        {
+            var privateKey: PrivateKey? = nil
+            while privateKey == nil
+            {
+                let tempPrivateKey = try PrivateKey(type: type)
+                guard tempPrivateKey.data != nil else
+                {
+                    continue
+                }
+                privateKey = tempPrivateKey
+            }
+
+            guard let privateKey = privateKey else
+            {
+                return nil
+            }
+
+            return Keypair(privateKey: privateKey, publicKey: privateKey.publicKey)
+        }
+        catch
+        {
+            return nil
+        }
+    }
+
     public func retrieveOrGeneratePrivateKey(label: String, type: KeyType) -> PrivateKey?
     {
         // Do we already have a key?
