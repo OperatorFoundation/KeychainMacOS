@@ -253,6 +253,7 @@ public class Keychain: Codable, KeychainProtocol
         ]
 
         let status = SecItemAdd(query as CFDictionary, nil)
+        let statusDescription = SecCopyErrorMessageString(status, nil)
         guard status == errSecSuccess else
         {
             throw KeychainError.addFailed(status)
@@ -271,8 +272,10 @@ public class Keychain: Codable, KeychainProtocol
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
+        print("DEBUG: Retrieve password item status - \(status.string)")
         guard status != errSecItemNotFound else
         {
+            print("Error: \(errSecItemNotFound)")
             throw KeychainError.noPassword
         }
 
