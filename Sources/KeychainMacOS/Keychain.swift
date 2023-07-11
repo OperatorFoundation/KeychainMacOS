@@ -7,6 +7,7 @@ import KeychainTypes
 
 public class Keychain: Codable, KeychainProtocol
 {
+    
     public init()
     {
     }
@@ -243,20 +244,30 @@ public class Keychain: Codable, KeychainProtocol
         }
     }
 
-    public func storePassword(server: String, username: String, password: String) throws
+    public func storePassword(server: String, username: String, password: String, overwrite: Bool = false) throws
     {
+        let passwordData = password.data
+        
         let query: [String: Any] = [
             kSecClass as String: kSecClassInternetPassword,
             kSecAttrAccount as String: username,
             kSecAttrServer as String: server,
-            kSecValueData as String: password
+            kSecValueData as String: passwordData
         ]
 
-        let status = SecItemAdd(query as CFDictionary, nil)
-        let statusDescription = SecCopyErrorMessageString(status, nil)
+        var status = SecItemAdd(query as CFDictionary, nil)
+        
+                
+        // If a password already exists, replace it.
+        if status == errSecDuplicateItem && overwrite
+        {
+            status = SecItemUpdate(query as CFDictionary, [kSecValueData as String: passwordData] as CFDictionary)
+        }
+        
         guard status == errSecSuccess else
         {
-            throw KeychainError.addFailed(status)
+            let statusDescription = SecCopyErrorMessageString(status, nil)
+            throw KeychainError.addFailed(statusDescription ?? status.string as CFString)
         }
     }
 
@@ -272,7 +283,8 @@ public class Keychain: Codable, KeychainProtocol
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        print("DEBUG: Retrieve password item status - \(status.string)")
+        
+        
         guard status != errSecItemNotFound else
         {
             print("Error: \(errSecItemNotFound)")
@@ -281,7 +293,11 @@ public class Keychain: Codable, KeychainProtocol
 
         guard status == errSecSuccess else
         {
-            throw KeychainError.readFailed(status)
+            let statusDescription = SecCopyErrorMessageString(status, nil)
+            
+            print("DEBUG: Retrieve password item status - \(statusDescription ?? status.string as CFString)")
+            
+            throw KeychainError.readFailed(statusDescription ?? status.string as CFString)
         }
 
         guard let existingItem = item as? [String : Any],
@@ -341,9 +357,9 @@ public class Keychain: Codable, KeychainProtocol
 
 public enum KeychainError: Error
 {
-    case addFailed(OSStatus)
+    case addFailed(CFString)
     case deleteFailed(OSStatus)
     case noPassword
-    case readFailed(OSStatus)
+    case readFailed(CFString)
     case unexpectedPasswordData
 }
