@@ -154,7 +154,9 @@ public class Keychain: Codable, KeychainProtocol
                      kSecAttrApplicationLabel: label,
                      kSecAttrAccessible: kSecAttrAccessibleWhenUnlocked,
                      kSecUseDataProtectionKeychain: true,
-                     kSecValueRef: secKey] as [String: Any]
+                     kSecValueData: secKey] as [String: Any]
+        
+        // If a private key already exists, replace it.
 
         // Add the key to the keychain.
         let status = SecItemAdd(query as CFDictionary, nil)
@@ -162,6 +164,17 @@ public class Keychain: Codable, KeychainProtocol
         switch status {
         case errSecSuccess:
             return true
+        case errSecDuplicateItem:
+            if status == SecItemUpdate(query as CFDictionary, [kSecValueData as String: secKey] as CFDictionary)
+            {
+                print("Updated Private Key successfully.")
+                return true
+            }
+            else
+            {
+                print("Unable to save the updated Private Key.")
+                return false
+            }
         default:
             if let statusString = SecCopyErrorMessageString(status, nil)
             {
