@@ -50,7 +50,7 @@ public class Keychain: Codable, KeychainProtocol
                 print("Our key.type does not match the type. Returning nothing, when we want a key.")
                 return nil
             }
-            print("returning our private key: \(key)")
+
             return key
         }
 
@@ -58,14 +58,12 @@ public class Keychain: Codable, KeychainProtocol
         {
             // We don't?
             // Let's create some and return those
-            print("The project doesn't think it has any keys and is about to create some.")
             var privateKey: PrivateKey? = nil
             while privateKey == nil
             {
                 let tempPrivateKey = try PrivateKey(type: type)
                 guard tempPrivateKey.data != nil else
                 {
-                    print("Reached the continue in the guard against our tempPrivateKey being nil.")
                     continue
                 }
                 privateKey = tempPrivateKey
@@ -73,12 +71,11 @@ public class Keychain: Codable, KeychainProtocol
 
             guard let privateKey = privateKey else
             {
-                print("Reached the guard against our privateKey not matching.")
                 return nil
             }
 
             // Save the key we stored
-            let stored = storePrivateKey(privateKey, label: label)
+            let stored = storePrivateKey(privateKey, label: label, overwrite: true)
             if !stored
             {
                 print("😱 Failed to store our new server key.")
@@ -113,7 +110,7 @@ public class Keychain: Codable, KeychainProtocol
             }
 
             // Save the key we stored
-            guard storePrivateKey(privateKey, label: label) else
+            guard storePrivateKey(privateKey, label: label,overwrite: true) else
             {
                 print("😱 Failed to store our new server key.")
                 return nil
@@ -127,7 +124,7 @@ public class Keychain: Codable, KeychainProtocol
         }
     }
     
-    public func storePrivateKey(_ key: PrivateKey, label: String) -> Bool
+    public func storePrivateKey(_ key: PrivateKey, label: String, overwrite: Bool = false) -> Bool
     {
         let attributes = [kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom, kSecAttrKeyClass: kSecAttrKeyClassPrivate] as [String: Any]
 
@@ -159,35 +156,30 @@ public class Keychain: Codable, KeychainProtocol
         // If a private key already exists, replace it.
 
         // Add the key to the keychain.
-        let status = SecItemAdd(query as CFDictionary, nil)
+        var status = SecItemAdd(query as CFDictionary, nil)
         
-        switch status {
-        case errSecSuccess:
-            return true
-        case errSecDuplicateItem:
-            if status == SecItemUpdate(query as CFDictionary, [kSecValueRef as String: secKey] as CFDictionary)
-            {
-                print("Updated Private Key successfully.")
+        // If a key already exists, replace it.
+        if status == errSecDuplicateItem && overwrite
+        {
+            status = SecItemUpdate(query as CFDictionary, [kSecValueRef: secKey] as CFDictionary)
+        }
+        
+        switch status
+        {
+            case errSecSuccess:
                 return true
-            }
-            else
-            {
-                print("Unable to save the updated Private Key.")
+            default:
+                if let statusString = SecCopyErrorMessageString(status, nil)
+                {
+                    print("Unable to store item: \(statusString)")
+                }
+                
                 return false
-            }
-        default:
-            if let statusString = SecCopyErrorMessageString(status, nil)
-            {
-                print("Unable to store item: \(statusString)")
-            }
-            
-            return false
         }
     }
     
     public func retrievePrivateKey(label: String, type: KeyType) -> PrivateKey?
     {
-        print("You have reached the retreivePrivateKey() function in Keychain.")
         let query: CFDictionary = generateKeySearchQuery(label: label)
         
         // Find and cast the result as a SecKey instance.
