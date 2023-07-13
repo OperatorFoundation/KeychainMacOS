@@ -47,9 +47,10 @@ public class Keychain: Codable, KeychainProtocol
         {
             guard key.type == type else
             {
+                print("Our key.type does not match the type. Returning nothing, when we want a key.")
                 return nil
             }
-
+            print("returning our private key: \(key)")
             return key
         }
 
@@ -57,12 +58,14 @@ public class Keychain: Codable, KeychainProtocol
         {
             // We don't?
             // Let's create some and return those
+            print("The project doesn't think it has any keys and is about to create some.")
             var privateKey: PrivateKey? = nil
             while privateKey == nil
             {
                 let tempPrivateKey = try PrivateKey(type: type)
                 guard tempPrivateKey.data != nil else
                 {
+                    print("Reached the continue in the guard against our tempPrivateKey being nil.")
                     continue
                 }
                 privateKey = tempPrivateKey
@@ -70,6 +73,7 @@ public class Keychain: Codable, KeychainProtocol
 
             guard let privateKey = privateKey else
             {
+                print("Reached the guard against our privateKey not matching.")
                 return nil
             }
 
@@ -170,6 +174,7 @@ public class Keychain: Codable, KeychainProtocol
     
     public func retrievePrivateKey(label: String, type: KeyType) -> PrivateKey?
     {
+        print("You have reached the retreivePrivateKey() function in Keychain.")
         let query: CFDictionary = generateKeySearchQuery(label: label)
         
         // Find and cast the result as a SecKey instance.
