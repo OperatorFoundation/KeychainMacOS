@@ -243,6 +243,51 @@ public class Keychain: Codable, KeychainProtocol
         }
     }
 
+    public func ecdh(privateKey: PrivateKey, publicKey: PublicKey) -> SymmetricKey?
+    {
+        switch privateKey
+        {
+            case .Curve25519KeyAgreement(let privateKey):
+                switch publicKey
+                {
+                    case .Curve25519KeyAgreement(let publicKey):
+                        return privateKey.sharedSecretFromKeyAgreement(with: publicKey)
+
+                    default:
+                        return nil
+                }
+            case .P256KeyAgreement(let privateKey):
+                switch publicKey
+                {
+                    case .P256KeyAgreement(let publicKey):
+                        return privateKey.sharedSecretFromKeyAgreement(with: publicKey)
+
+                    default:
+                        return nil
+                }
+            case .P384KeyAgreement(let privateKey):
+                switch publicKey
+                {
+                    case .P384KeyAgreement(let publicKey):
+                        return privateKey.sharedSecretFromKeyAgreement(with: publicKey)
+
+                    default:
+                        return nil
+                }
+            case .P521KeyAgreement(let privateKey):
+                switch publicKey
+                {
+                    case .P521KeyAgreement(let privateKey):
+                        return privateKey.sharedSecretFromKeyAgreement(with: publicKey)
+
+                    default:
+                        return nil
+                }
+            default:
+                return nil
+        }
+    }
+
     public func storePassword(server: String, username: String, password: String) throws
     {
         let query: [String: Any] = [
