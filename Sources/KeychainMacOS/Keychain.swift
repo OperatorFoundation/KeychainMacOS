@@ -6,7 +6,7 @@ import Datable
 import KeychainTypes
 
 public class Keychain: Codable, KeychainProtocol
-{    
+{
     public init()
     {
     }
@@ -351,17 +351,29 @@ public class Keychain: Codable, KeychainProtocol
 
     public func ecdh(privateKey: PrivateKey, publicKey: PublicKey) -> SymmetricKey?
     {
-        switch privateKey
+        let sharedSecret: SharedSecret
+        do
         {
-            case .Curve25519KeyAgreement(let privateKey):
-                switch publicKey
-                {
-                    case .Curve25519KeyAgreement(let publicKey):
-                        return privateKey.sharedSecretFromKeyAgreement(with: publicKey)
+            switch privateKey
+            {
+                case .Curve25519KeyAgreement(let privateKey):
+                    switch publicKey
+                    {
+                        case .Curve25519KeyAgreement(let publicKey):
+                            let sharedSecret = try privateKey.sharedSecretFromKeyAgreement(with: publicKey)
+                            let sharedSecretData = sharedSecret.withUnsafeBytes
+                            {
+                                pointer in
 
-                    default:
-                        return nil
-                }
+                                return Data(pointer)
+                            }
+                            let symmetricKey = SymmetricKey(data: sharedSecretData)
+                            return symmetricKey
+                    }
+
+                default:
+                    return nil
+            }
             case .P256KeyAgreement(let privateKey):
                 switch publicKey
                 {
@@ -391,6 +403,11 @@ public class Keychain: Codable, KeychainProtocol
                 }
             default:
                 return nil
+        }
+        catch
+        {
+            print("Error in ECDH: \(error)")
+            return nil
         }
     }
 
