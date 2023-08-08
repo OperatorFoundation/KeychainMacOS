@@ -393,6 +393,17 @@ public class Keychain: Codable, KeychainProtocol
                         default:
                             return nil
                     }
+
+                case .P256SecureEnclaveKeyAgreement(let privateKey):
+                    switch publicKey
+                    {
+                        case .P256KeyAgreement(let publicKey):
+                            sharedSecret = try privateKey.sharedSecretFromKeyAgreement(with: publicKey)
+                            
+                        default:
+                            return nil
+                    }
+                    
                 default:
                     return nil
             }
