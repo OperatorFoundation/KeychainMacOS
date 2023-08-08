@@ -360,49 +360,53 @@ public class Keychain: Codable, KeychainProtocol
                     switch publicKey
                     {
                         case .Curve25519KeyAgreement(let publicKey):
-                            let sharedSecret = try privateKey.sharedSecretFromKeyAgreement(with: publicKey)
-                            let sharedSecretData = sharedSecret.withUnsafeBytes
-                            {
-                                pointer in
-
-                                return Data(pointer)
-                            }
-                            let symmetricKey = SymmetricKey(data: sharedSecretData)
-                            return symmetricKey
+                            sharedSecret = try privateKey.sharedSecretFromKeyAgreement(with: publicKey)
+                            
+                        default:
+                            return nil
                     }
 
+                case .P256KeyAgreement(let privateKey):
+                    switch publicKey
+                    {
+                        case .P256KeyAgreement(let publicKey):
+                            sharedSecret = try privateKey.sharedSecretFromKeyAgreement(with: publicKey)
+
+                        default:
+                            return nil
+                    }
+                case .P384KeyAgreement(let privateKey):
+                    switch publicKey
+                    {
+                        case .P384KeyAgreement(let publicKey):
+                            sharedSecret = try privateKey.sharedSecretFromKeyAgreement(with: publicKey)
+
+                        default:
+                            return nil
+                    }
+                case .P521KeyAgreement(let privateKey):
+                    switch publicKey
+                    {
+                        case .P521KeyAgreement(let publicKey):
+                            sharedSecret = try privateKey.sharedSecretFromKeyAgreement(with: publicKey)
+
+                        default:
+                            return nil
+                    }
                 default:
                     return nil
             }
-            case .P256KeyAgreement(let privateKey):
-                switch publicKey
-                {
-                    case .P256KeyAgreement(let publicKey):
-                        return privateKey.sharedSecretFromKeyAgreement(with: publicKey)
+            
+            let sharedSecretData = sharedSecret.withUnsafeBytes
+            {
+                pointer in
 
-                    default:
-                        return nil
-                }
-            case .P384KeyAgreement(let privateKey):
-                switch publicKey
-                {
-                    case .P384KeyAgreement(let publicKey):
-                        return privateKey.sharedSecretFromKeyAgreement(with: publicKey)
-
-                    default:
-                        return nil
-                }
-            case .P521KeyAgreement(let privateKey):
-                switch publicKey
-                {
-                    case .P521KeyAgreement(let privateKey):
-                        return privateKey.sharedSecretFromKeyAgreement(with: publicKey)
-
-                    default:
-                        return nil
-                }
-            default:
-                return nil
+                return Data(pointer)
+            }
+            
+            let symmetricKey = SymmetricKey(data: sharedSecretData)
+            
+            return symmetricKey
         }
         catch
         {
