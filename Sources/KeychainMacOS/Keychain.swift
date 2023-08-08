@@ -6,7 +6,7 @@ import Datable
 import KeychainTypes
 
 public class Keychain: Codable, KeychainProtocol
-{
+{    
     public init()
     {
     }
@@ -46,6 +46,7 @@ public class Keychain: Codable, KeychainProtocol
         {
             guard key.type == type else
             {
+                print("Our key.type does not match the type. Returning nothing, when we want a key.")
                 return nil
             }
 
@@ -73,7 +74,7 @@ public class Keychain: Codable, KeychainProtocol
             }
 
             // Save the key we stored
-            let stored = storePrivateKey(privateKey, label: label)
+            let stored = storePrivateKey(privateKey, label: label, overwrite: true)
             if !stored
             {
                 print("😱 Failed to store our new server key.")
@@ -108,7 +109,7 @@ public class Keychain: Codable, KeychainProtocol
             }
 
             // Save the key we stored
-            guard storePrivateKey(privateKey, label: label) else
+            guard storePrivateKey(privateKey, label: label,overwrite: true) else
             {
                 print("😱 Failed to store our new server key.")
                 return nil
@@ -122,8 +123,21 @@ public class Keychain: Codable, KeychainProtocol
         }
     }
     
-    public func storePrivateKey(_ key: PrivateKey, label: String) -> Bool
+    public func storePrivateKey(_ key: PrivateKey, label: String, overwrite: Bool = false) -> Bool
     {
+        if key.type == .P256SecureEnclaveKeyAgreement
+        {
+            do
+            {
+                try storeSecureEnclavePrivateKey(key, label: label, overwrite: overwrite)
+                return true
+            }
+            catch
+            {
+                return false
+            }
+        }
+        
         let attributes = [kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom, kSecAttrKeyClass: kSecAttrKeyClassPrivate] as [String: Any]
 
         // Get a SecKey representation.
@@ -150,25 +164,37 @@ public class Keychain: Codable, KeychainProtocol
                      kSecAttrAccessible: kSecAttrAccessibleWhenUnlocked,
                      kSecUseDataProtectionKeychain: true,
                      kSecValueRef: secKey] as [String: Any]
+        
+        // If a private key already exists, replace it.
 
         // Add the key to the keychain.
-        let status = SecItemAdd(query as CFDictionary, nil)
+        var status = SecItemAdd(query as CFDictionary, nil)
         
-        switch status {
-        case errSecSuccess:
-            return true
-        default:
-            if let statusString = SecCopyErrorMessageString(status, nil)
-            {
-                print("Unable to store item: \(statusString)")
-            }
-            
-            return false
+        // If a key already exists, replace it.
+        if status == errSecDuplicateItem && overwrite
+        {
+            status = SecItemUpdate(query as CFDictionary, [kSecValueRef: secKey] as CFDictionary)
+        }
+        
+        switch status
+        {
+            case errSecSuccess:
+                return true
+            default:
+                let statusDescription = SecCopyErrorMessageString(status, nil)
+                print("Failed to store a private key: \(statusDescription ?? status.string as CFString)")
+                
+                return false
         }
     }
     
     public func retrievePrivateKey(label: String, type: KeyType) -> PrivateKey?
     {
+        if type == .P256SecureEnclaveKeyAgreement
+        {
+            return retrieveSecureEnclavePrivateKey(label: label, type: type)
+        }
+        
         let query: CFDictionary = generateKeySearchQuery(label: label)
         
         // Find and cast the result as a SecKey instance.
@@ -208,6 +234,86 @@ public class Keychain: Codable, KeychainProtocol
         {
             print("Error decoding key: \(keyError)")
             return nil
+        }
+    }
+    
+    /// Secure Enclave Keys have no direct keychain corollary.
+    /// To store these keys, package them as generic passwords.
+    /// https://developer.apple.com/documentation/cryptokit/storing_cryptokit_keys_in_the_keychain#3369559
+    public func storeSecureEnclavePrivateKey(_ key: PrivateKey, label: String, overwrite: Bool) throws
+    {
+        guard key.type == .P256SecureEnclaveKeyAgreement else
+        {
+            throw KeychainError.storeSecureEnclaveKeyFailed("Unexpected type: \(key.type)")
+        }
+        guard let keyData = key.data else
+        {
+            throw KeychainError.storeSecureEnclaveKeyFailed("The key's data field was nil.")
+        }
+        
+        // Treat the key data as a generic password.
+        let query = [kSecClass: kSecClassGenericPassword,
+                     kSecAttrAccount: label,
+                     kSecAttrAccessible: kSecAttrAccessibleWhenUnlocked,
+                     kSecUseDataProtectionKeychain: true,
+                 kSecValueData: keyData] as [String: Any]
+
+
+        // Add the key data.
+        var status = SecItemAdd(query as CFDictionary, nil)
+        
+        // If a key already exists, replace it.
+        if status == errSecDuplicateItem && overwrite
+        {
+            status = SecItemUpdate(query as CFDictionary, [kSecValueData: keyData] as CFDictionary)
+        }
+        
+        guard status == errSecSuccess else
+        {
+            let statusDescription = SecCopyErrorMessageString(status, nil)
+            throw KeychainError.addFailed(statusDescription ?? status.string as CFString)
+        }
+    }
+    
+    /// TODO: Currently only supports P256SecureEnclaveKeyAgreement
+    public func retrieveSecureEnclavePrivateKey(label: String, type: KeyType) -> PrivateKey?
+    {
+        guard type == .P256SecureEnclaveKeyAgreement else
+        {
+            print("Unsupported key type for Secure Enclave retrieval: \(type)")
+            return nil
+        }
+        
+        // Seek a generic password with the given account.
+        let query = [kSecClass: kSecClassGenericPassword,
+                     kSecAttrAccount: label,
+                     kSecUseDataProtectionKeychain: true,
+                     kSecReturnData: true] as [String: Any]
+
+
+        // Find and cast the result as data.
+        var item: CFTypeRef?
+        switch SecItemCopyMatching(query as CFDictionary, &item)
+        {
+            case errSecSuccess:
+                guard let data = item as? Data else { return nil }
+                do
+                {
+                    // Convert back to a key.
+                    let storedKey = try SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: data)
+                         
+                    return PrivateKey.P256SecureEnclaveKeyAgreement(storedKey)
+                }
+                catch
+                {
+                    print("Failed to decode a stored key: \(error)")
+                    return nil
+                }
+
+            case let status:
+                let statusDescription = SecCopyErrorMessageString(status, nil)
+                print("Keychain read failed: \(statusDescription ?? status.string as CFString)")
+                return nil
         }
     }
     
@@ -288,19 +394,30 @@ public class Keychain: Codable, KeychainProtocol
         }
     }
 
-    public func storePassword(server: String, username: String, password: String) throws
+    public func storePassword(server: String, username: String, password: String, overwrite: Bool = false) throws
     {
+        let passwordData = password.data
+        
         let query: [String: Any] = [
             kSecClass as String: kSecClassInternetPassword,
             kSecAttrAccount as String: username,
             kSecAttrServer as String: server,
-            kSecValueData as String: password
+            kSecValueData as String: passwordData
         ]
 
-        let status = SecItemAdd(query as CFDictionary, nil)
+        var status = SecItemAdd(query as CFDictionary, nil)
+        
+                
+        // If a password already exists, replace it.
+        if status == errSecDuplicateItem && overwrite
+        {
+            status = SecItemUpdate(query as CFDictionary, [kSecValueData as String: passwordData] as CFDictionary)
+        }
+        
         guard status == errSecSuccess else
         {
-            throw KeychainError.addFailed(status)
+            let statusDescription = SecCopyErrorMessageString(status, nil)
+            throw KeychainError.addFailed(statusDescription ?? status.string as CFString)
         }
     }
 
@@ -316,14 +433,21 @@ public class Keychain: Codable, KeychainProtocol
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
+        
+        
         guard status != errSecItemNotFound else
         {
+            print("Error: \(errSecItemNotFound)")
             throw KeychainError.noPassword
         }
 
         guard status == errSecSuccess else
         {
-            throw KeychainError.readFailed(status)
+            let statusDescription = SecCopyErrorMessageString(status, nil)
+            
+            print("DEBUG: Retrieve password item status - \(statusDescription ?? status.string as CFString)")
+            
+            throw KeychainError.readFailed(statusDescription ?? status.string as CFString)
         }
 
         guard let existingItem = item as? [String : Any],
@@ -383,9 +507,10 @@ public class Keychain: Codable, KeychainProtocol
 
 public enum KeychainError: Error
 {
-    case addFailed(OSStatus)
+    case addFailed(CFString)
     case deleteFailed(OSStatus)
     case noPassword
-    case readFailed(OSStatus)
+    case readFailed(CFString)
     case unexpectedPasswordData
+    case storeSecureEnclaveKeyFailed(String)
 }
