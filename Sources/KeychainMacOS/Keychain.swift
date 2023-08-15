@@ -88,7 +88,7 @@ public class Keychain: Codable, KeychainProtocol
         }
     }
     
-    public func generateAndSavePrivateKey(label: String, type: KeyType) -> PrivateKey?
+    public func generateAndSavePrivateKey(label: String, type: KeyType, overwrite: Bool = false) -> PrivateKey?
     {
         do
         {
@@ -109,7 +109,7 @@ public class Keychain: Codable, KeychainProtocol
             }
 
             // Save the key we stored
-            guard storePrivateKey(privateKey, label: label,overwrite: true) else
+            guard storePrivateKey(privateKey, label: label, overwrite: overwrite) else
             {
                 print("😱 Failed to store our new server key.")
                 return nil
