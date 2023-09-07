@@ -77,7 +77,7 @@ public class Keychain: Codable, KeychainProtocol
             let stored = storePrivateKey(privateKey, label: label, overwrite: true)
             if !stored
             {
-                print("😱 Failed to store our new server key.")
+                print("😱 retrieveOrGeneratePrivateKey: Failed to store our new server key.")
                 return nil
             }
             return privateKey
@@ -111,7 +111,7 @@ public class Keychain: Codable, KeychainProtocol
             // Save the key we stored
             guard storePrivateKey(privateKey, label: label, overwrite: overwrite) else
             {
-                print("😱 Failed to store our new server key.")
+                print("😱 generateAndSavePrivateKey: Failed to store our new server key.")
                 return nil
             }
 
@@ -158,9 +158,14 @@ public class Keychain: Codable, KeychainProtocol
             return false
         }
         
+        /**
+         kSecAttrApplicationLabel:
+         The corresponding value is of type CFData and contains a label for this item. This attribute is different from the kSecAttrLabel attribute, which is intended to be human-readable. Instead, this attribute is used to look up a key programmatically; in particular, for keys of class kSecAttrKeyClassPublic and kSecAttrKeyClassPrivate, the value of this attribute is the hash of the public key.
+         */
+        
         // Describe the add operation.
         let query = [kSecClass: kSecClassKey,
-                     kSecAttrApplicationLabel: label,
+                     kSecAttrLabel: label,
                      kSecAttrAccessible: kSecAttrAccessibleWhenUnlocked,
                      kSecUseDataProtectionKeychain: true,
                      kSecValueRef: secKey] as [String: Any]
@@ -173,7 +178,12 @@ public class Keychain: Codable, KeychainProtocol
         // If a key already exists, replace it.
         if status == errSecDuplicateItem && overwrite
         {
-            status = SecItemUpdate(query as CFDictionary, [kSecValueRef: secKey] as CFDictionary)
+            let updateQuery = [kSecClass: kSecClassKey,
+                kSecAttrApplicationLabel: label,
+                kSecAttrAccessible: kSecAttrAccessibleWhenUnlocked,
+                kSecUseDataProtectionKeychain: true] as [String : Any]
+            
+            status = SecItemUpdate(updateQuery as CFDictionary, [kSecValueRef: secKey] as CFDictionary)
         }
         
         switch status
