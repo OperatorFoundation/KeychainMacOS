@@ -19,7 +19,7 @@ let package = Package(
         // Dependencies declare other packages that this package depends on.
         // .package(url: /* package url */, from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "2.5.0"),
-        .package(url: "https://github.com/OperatorFoundation/KeychainTypes", branch: "main"),
+        .package(url: "https://github.com/OperatorFoundation/KeychainTypes", branch: "release"),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
